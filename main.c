@@ -9,14 +9,28 @@
 void main_loop();
 char* read_line();
 char** parse_line(char*);
-void execute_command(char**);
+int execute_command(char**);
 void launch_shell(char**);
+int number_of_builtins();
+//builtin shell commands
+int cd (char**);
+int Exit (char**);
+
+
+char* builtin_str [] = {        // Have to be builtins to manipulate the current (parent) process.
+        "cd",
+        "exit"
+};
+
+int(*builtin_function[]) (char**) = {   // An array of function pointers that take an array of strings,
+        &cd,                            // and return an int
+        &Exit
+};
+
 
 int main() {
 
     main_loop(); //Read , Parse , Execute.
-
-    //TODO  Add exit commands
 
     return 0;
 }
@@ -24,8 +38,9 @@ int main() {
 void main_loop (){
     char* line;
     char** arguments;
+    int status = 1;
 
-    while (1){
+    while (status){
 
         printf("shell> ");
 
@@ -36,7 +51,7 @@ void main_loop (){
         arguments = parse_line(line);
 
         //Execute
-        //execute_command(arguments);
+        status = execute_command(arguments);
     }
 }
 
@@ -116,8 +131,18 @@ char** parse_line(char* line){
     return tokens;
 }
 
-void execute_command(char** arguments){
+int execute_command(char** arguments){
+    if(arguments[0] == NULL){   // Empty command line.
+        return 1;
+    }
 
+    for( int i=0 ; i<number_of_builtins() ; i++){
+        if(strcmp(arguments[0] , builtin_str[i]) == 0){
+            return (*builtin_function[i])(arguments);
+        }
+    }
+    launch_shell(arguments);
+    return 1; // To keep the main loop from breaking.
 }
 
 void launch_shell(char** arguments){
@@ -128,7 +153,7 @@ void launch_shell(char** arguments){
 
     if(pid == 0){       // Child process
         if( execvp( arguments[0] , arguments) == -1){
-            perror("execvp FAILED");
+            perror("execvp FAILED, A command doesn't exist or can't be executed");
         }
         exit(EXIT_FAILURE);
     }
@@ -141,4 +166,24 @@ void launch_shell(char** arguments){
         }
         while( !WIFEXITED(status) && !WIFSIGNALED(status));
     }
+}
+
+int cd (char** arguments){
+    if(arguments [1] == NULL){
+        fprintf(stderr , "Expexted argument to \"cd\"\n");
+    }
+    else{
+        if(chdir(arguments[1]) != 0){
+            perror("chdir FAILED");
+        }
+    }
+    return 1;
+}
+
+int Exit(char** arguments){
+    return 0;
+}
+
+int number_of_builtins(){
+    return sizeof(builtin_str) / sizeof(char*);
 }
