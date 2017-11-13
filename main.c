@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #define BUFFER_SIZE 64
 
 void main_loop();
 char* read_line();
-char** parse_line(char* line);
+char** parse_line(char*);
 void execute_command(char**);
+void launch_shell(char**);
 
 int main() {
 
@@ -111,4 +114,31 @@ char** parse_line(char* line){
     }
     tokens[position] = NULL;
     return tokens;
+}
+
+void execute_command(char** arguments){
+
+}
+
+void launch_shell(char** arguments){
+    pid_t pid ;
+    int status;
+
+    pid = fork();
+
+    if(pid == 0){       // Child process
+        if( execvp( arguments[0] , arguments) == -1){
+            perror("execvp FAILED");
+        }
+        exit(EXIT_FAILURE);
+    }
+    else if( pid < 0){
+        perror("Fork FAILED");
+    }
+    else{               // Parent process
+        do{
+            waitpid( pid , &status , WUNTRACED);
+        }
+        while( !WIFEXITED(status) && !WIFSIGNALED(status));
+    }
 }
