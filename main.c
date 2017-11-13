@@ -1,11 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BUFFER_SIZE 64
 
 void main_loop();
 char* read_line();
-char** parse_line();
+char** parse_line(char* line);
 void execute_command(char**);
 
 int main() {
@@ -28,9 +29,8 @@ void main_loop (){
         //Read
         line = read_line();
 
-        printf("\n\n YOUR COMMAND IS: %s\n\n" , line);
         //Parse
-        //arguments = parse_line();
+        arguments = parse_line(line);
 
         //Execute
         //execute_command(arguments);
@@ -80,4 +80,35 @@ char* read_line(){
         }
     }
 
+}
+
+char** parse_line(char* line){
+    int buffer_size = BUFFER_SIZE;
+    int position = 0;
+    char** tokens = malloc(sizeof(char*) * buffer_size);
+    char* token;
+
+    if(!tokens){
+        fprintf(stderr , "Tokens allocation error\n");
+        exit(EXIT_FAILURE);
+    }
+
+    //TODO edit the delimiters.
+    token = strtok(line , " ");
+    while(token != NULL){
+        tokens[position] = token;
+        position++;
+
+        if(position >= buffer_size){
+            buffer_size += BUFFER_SIZE;
+            tokens = realloc(tokens, sizeof(char*) * buffer_size);
+            if(!tokens){
+                fprintf(stderr , "Tokens allocation error\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        token = strtok(NULL , " ");
+    }
+    tokens[position] = NULL;
+    return tokens;
 }
