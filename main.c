@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #define BUFFER_SIZE 64
 
@@ -10,14 +11,14 @@ void main_loop();
 char* read_line();
 char** parse_line(char*);
 int execute_command(char**);
-void launch_shell(char**);
+void launch_shell(char** , bool);
 int number_of_builtins();
 //builtin shell commands
-int cd (char**);
+int  cd (char**);
 int Exit (char**);
 
 
-char* builtin_str [] = {        // Have to be builtins to manipulate the current (parent) process.
+char* builtin_str [] = {                 // Have to be builtins to manipulate the current (parent) process.
         "cd",
         "exit"
 };
@@ -97,7 +98,6 @@ char* read_line(){
             }
         }
     }
-
 }
 
 char** parse_line(char* line){
@@ -127,11 +127,31 @@ char** parse_line(char* line){
         }
         token = strtok(NULL , " ");
     }
-    tokens[position] = NULL;
+
+
+    if(strcmp(tokens[position-1] , "&") ==0) {
+        tokens[position] = NULL;
+    }
+    else if( tokens[position-1][strlen(tokens[position-1])-1] == '&' && strlen(tokens[position-1]) > strlen(strtok(tokens[position-1] , "&"))){
+        tokens[position-1] = strtok(tokens[position-1] , "&");
+        tokens[position] = "&";
+        position++;
+        if(position >= buffer_size){
+            buffer_size += BUFFER_SIZE;
+            tokens = realloc(tokens, sizeof(char*) * buffer_size);
+            if(!tokens){
+                fprintf(stderr , "Tokens allocation error\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        tokens[position] = NULL;
+    }
+
     return tokens;
 }
 
 int execute_command(char** arguments){
+    bool wait = true;
     if(arguments[0] == NULL){   // Empty command line.
         return 1;
     }
@@ -141,11 +161,24 @@ int execute_command(char** arguments){
             return (*builtin_function[i])(arguments);
         }
     }
-    launch_shell(arguments);
+
+    int i =0;
+    while(arguments[i]){
+        if(strcmp(arguments[i] , "&") == 0){
+            arguments[i] = NULL;
+            wait = false;
+            //printf("wait = false\n");
+            break;
+        }
+        i++;
+    }
+
+
+    launch_shell(arguments , wait);
     return 1; // To keep the main loop from breaking.
 }
 
-void launch_shell(char** arguments){
+void launch_shell(char** arguments , bool wait){
     pid_t pid ;
     int status;
 
@@ -161,16 +194,19 @@ void launch_shell(char** arguments){
         perror("Fork FAILED");
     }
     else{               // Parent process
-        do{
-            waitpid( pid , &status , WUNTRACED);
+        if(wait){
+            //printf("you are waiting \n");
+            do{
+                waitpid( pid , &status , WUNTRACED);
+            }
+            while( !WIFEXITED(status) && !WIFSIGNALED(status));
         }
-        while( !WIFEXITED(status) && !WIFSIGNALED(status));
     }
 }
 
 int cd (char** arguments){
     if(arguments [1] == NULL){
-        fprintf(stderr , "Expexted argument to \"cd\"\n");
+        fprintf(stderr , "Expected argument to \"cd\"\n");
     }
     else{
         if(chdir(arguments[1]) != 0){
